@@ -21,7 +21,7 @@ Requalizer was evaluated on a cluster of eight virtual machines, each with 2 vCP
 
 We recommend that the machine has at least 10 GB of disk space available for the experiment data.
 
-You can run the artifact on any machine using Docker, but the performance you observe might be slightly different than those in the paper due to platform differences.
+You can run the artifact on any machine using Docker, but the performance you observe will be different from that in the paper due to platform differences (see the note at the end of [Running the Experiment](#running-the-experiment)).
 
 ---
 
@@ -29,7 +29,7 @@ You can run the artifact on any machine using Docker, but the performance you ob
 
 The quickest and recommended way to get started with running the artifact is to use the [pre-built Docker image](https://hub.docker.com/r/jungkumseok/requalizer) available at Docker Hub (`jungkumseok/requalizer:middleware26`), as it has the experiment environment already prepared with all the dependencies installed and workloads copied. The `Dockerfile` used to build the image can be found in this repository. 
 
-Before starting a new container from the pre-built image, you must first decide whether you want to mount any volume. This artifact *does not* require any volume to be mounted, but if you want to easily access any data produced inside the container, we suggest you mount a directory from your host machine to the container path `/root/output`. The experimental scripts are configured to save all data to `/root/output`.
+Before starting a new container from the pre-built image, you must first decide whether you want to mount any volume. This artifact *does not* require any volume to be mounted, but if you want to easily access any data produced inside the container, we suggest you mount a directory from your host machine to the container path `/root/output`. The experiment script (`run-experiment.sh`) and the scripts that produce the figures and tables are configured to save their data to `/root/output` (the `REQUALIZER_OUTPUT_ROOT` environment variable).
 
 Start a new container and enter the interactive shell:
 
@@ -86,6 +86,7 @@ throughput-plot.pdf
 violations-table.txt
 mttr-table.txt
 ```
+(`generate-violations-table.py` also writes the processed violation data, `violations_stable_processed.csv` and `violations_dynamic_processed.csv`.)
 
 If you have mounted a host directory, you should be able to see these files in the host machine. If not, you will need to `docker cp` the files into the host machine.
 ```
@@ -107,19 +108,19 @@ The reference scripts are located in `/root/requalizer/scripts/experiment/`. To 
 source ../presentation/.venv/bin/activate
 ```
 
-**1. Workload Placement / Scheduling (`cp-scheduler.py`)**
+**1. Workload Placement / Scheduling (`scheduler.py`)**
 This script demonstrates the dataflow-aware workload placement strategy (Section 4.3). It uses Google OR-Tools Constraint Programming to map predictive services to physical hosts, optimizing for bandwidth and latency while strictly adhering to DIFT isolation tags and group anti-affinity.
 You can test the scheduling decisions for different applications (AAL, FD, SPG) in aware or unaware modes, or run a scalability test.
 ```bash
 # Run the scheduler for the Ambient Assisted Living (AAL) topology
-python cp-scheduler.py --app AAL --mode aware
+python scheduler.py --app AAL --mode aware
 
 # Or run the scalability test for a 16-node cluster with 10 parallel services
-python cp-scheduler.py --app SCALE --hosts 16 --services 10
+python scheduler.py --app SCALE --hosts 16 --services 10
 ```
 
 **Interpreting the Scheduler Output (AAL Example)**
-If you run the AAL application in `aware` mode (`python cp-scheduler.py --app AAL --mode aware`), you can observe Requalizer's algorithms in action:
+If you run the AAL application in `aware` mode (`python scheduler.py --app AAL --mode aware`), you can observe Requalizer's algorithms in action:
 * **The Host Setup**: The script models an 8-node edge-to-cloud cluster. Hosts 0-2 are in the `public` zone, 3-5 are `internal` cloud servers, and 6-7 are edge devices located at the `patient`'s home (equipped with specific sensors like `camera` or `wearable`).
 * **The Scheduling Problem**: We must place 11 microservices of the AAL pipeline onto these 8 hosts. The placement must respect resource limits (CPU/RAM), network topology (bandwidth/latency), and most importantly, the DIFT isolation rules (e.g., highly sensitive patient video data cannot be processed on a `public` node). Furthermore, the 4 instances of the `Notifier` service belong to a replica group and must be spread across different hosts to ensure resilience (anti-affinity).
 * **The Solution**: The OR-Tools solver outputs an optimal placement mapping. You will observe that:
@@ -140,21 +141,21 @@ python load-balancer.py --redundancy 2
 If you run the load balancer script, you will see a computed routing Flow Matrix:
 * **The Setup**: Unlike the other scripts, this script uses arbitrary abstract labels (`W`, `X`, `Y`, `Z`) instead of the paper's specific `patient`/`internal`/`public` labels. This serves to demonstrate the mathematical generality of the algorithm regardless of the specific tag ontology.
 * **The Problem**: The middleware needs to route continuous message streams from sources to sinks. It must balance the load evenly across available sinks (satisfying demand proportions) while strictly obeying the isolation rules (e.g., `X` data can only flow to `X` and `Z` sinks, but never `Y`).
-* **The Solution**: The computed matrix mathematically proves the **Availability Objective** defined in the paper. By running it with `--redundancy 2` ($c=2$), the solver forces the flow matrix to distribute every message type across *at least two* valid sinks. This guarantees that if a single sink node crashes during dynamic conditions (Experiment 2), the system can seamlessly fall back to the redundant active route without ever violating DIFT rules. 
+* **The Solution**: The computed matrix mathematically proves the **Availability Objective** defined in the paper. By running it with `--redundancy 2` ($c=2$), the solver forces the flow matrix to distribute every message type across *at least two* valid sinks. This guarantees that if a single sink node crashes during dynamic conditions (the paper's Exp. 2, Section 5.5), the system can seamlessly fall back to the redundant active route without ever violating DIFT rules. 
 
-**3. Dataflow & Correctness Simulator (`dift-simulator.py`)**
+**3. Dataflow & Correctness Simulator (`dataflow-simulator.py`)**
 This discrete-event simulator validates Requalizer's routing mechanisms and label propagation (RQ2: Correctness). It evaluates different node architectures under dynamic conditions, allowing you to observe the exact routing decisions and dataflow behavior.
 You can simulate any of the three applications (AAL, FD, SPG) across different dynamic conditions (`aware stable`, `unaware stable`, `unaware crash`, `unaware congestion`).
 ```bash
 # Simulate 10,000 messages through the AAL topology with DIFT-aware routing
-python dift-simulator.py --app AAL --mode 'aware stable' --messages 10000
+python dataflow-simulator.py --app AAL --mode 'aware stable' --messages 10000
 
 # Simulate the Smart Power Grid (SPG) topology under network congestion without DIFT awareness
-python dift-simulator.py --app SPG --mode 'unaware congestion' --messages 10000
+python dataflow-simulator.py --app SPG --mode 'unaware congestion' --messages 10000
 ```
 
 **Interpreting the Simulator Output**
-If you run the discrete-event simulator (`python dift-simulator.py --app AAL --mode 'aware stable' --messages 10000`), you will see a detailed Node Statistics table:
+If you run the discrete-event simulator (`python dataflow-simulator.py --app AAL --mode 'aware stable' --messages 10000`), you will see a detailed Node Statistics table:
 * **The Setup**: The simulator constructs the full application graph (e.g., AAL) and feeds 10,000 generated messages with random labels (`LOW`, `MEDIUM`, `HIGH`) into the entry point. The messages then flow downstream according to the rules of the selected `mode` architecture.
 * **The Problem**: We need to verify the correctness of the dynamic label propagation (RQ2). Specifically, we must ensure that no sensitive data ever "leaks" into an unauthorized component, even during complex dataflow paths or dynamic network conditions (like crashes or congestion).
 * **The Solution**: The output table displays the exact label distribution processed by each node in the topology. You can interpret the correctness by verifying the columns:
@@ -202,6 +203,7 @@ source .venv/bin/activate
 python plot-latency-histogram.py /root/output/my-experiment/plot-latency.csv
 python plot-throughput-snapshot.py /root/output/my-experiment/plot-throughput.csv
 ```
+As before, the figures are saved to `/root/output` as `latency-plot.pdf` and `throughput-plot.pdf`.
 
 > **Note:** Because the whole cluster runs locally on a single machine, the latencies and throughputs you see will be very different from those shown in the paper, which were measured on a cluster of eight virtual machines communicating over a real network. However, the general trend should hold: Requalizer's latency is similar to the Baseline's.
 

@@ -6,3 +6,8 @@
 scripts/presentation/.venv/
 **/*.log
 .git/
+# Experiment output the scripts write under data/ (run-all.sh's and run-experiment.sh's defaults, test runs):
+# only the original data belongs in the image.
+data/demo-results-*/
+data/experiment-*/
+data/test/
