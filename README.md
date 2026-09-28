@@ -1,7 +1,5 @@
 ## Requalizer -- Middleware '26 Artifact
 
-[![DOI](https://zenodo.org/badge/latestdoi/123456789)](https://doi.org/10.5281/zenodo.12345678)
-
 This repository contains the artifact for the Middleware '26 paper:
 
 > Requalizer: A Co-designed Information Flow Control and Quality of Service Management Framework
