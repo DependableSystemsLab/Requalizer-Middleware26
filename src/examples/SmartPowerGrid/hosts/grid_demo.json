@@ -1,0 +1,10 @@
+[
+  {"name": "public-1", "zone": "cloud-public", "label": "public", "cpuMillis": 2000, "memoryMB": 4096, "executables": ["node"], "idmSupport": ["node"]},
+  {"name": "public-2", "zone": "cloud-public", "label": "public", "cpuMillis": 2000, "memoryMB": 4096, "executables": ["node"], "idmSupport": ["node"]},
+  {"name": "public-3", "zone": "cloud-public", "label": "public", "cpuMillis": 2000, "memoryMB": 4096, "executables": ["node"], "idmSupport": ["node"]},
+  {"name": "internal-1", "zone": "cloud-private", "label": "internal", "cpuMillis": 2000, "memoryMB": 4096, "executables": ["node"], "idmSupport": ["node"]},
+  {"name": "internal-2", "zone": "cloud-private", "label": "internal", "cpuMillis": 2000, "memoryMB": 4096, "executables": ["node"], "idmSupport": ["node"]},
+  {"name": "internal-3", "zone": "cloud-private", "label": "internal", "cpuMillis": 2000, "memoryMB": 4096, "executables": ["node"], "idmSupport": ["node"]},
+  {"name": "client-1", "zone": "client-site", "label": "client", "cpuMillis": 2000, "memoryMB": 4096, "executables": ["node"], "idmSupport": ["node"]},
+  {"name": "client-2", "zone": "client-site", "label": "client", "cpuMillis": 2000, "memoryMB": 4096, "executables": ["node"], "idmSupport": ["node"]}
+]

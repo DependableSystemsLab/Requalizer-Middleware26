@@ -1,0 +1,84 @@
+// Demo: the Ambient Assisted Living application as configured in the Requalizer paper (Middleware '26,
+// §2, Figures 1, 5 and 6) and its reference scheduler (Requalizer-Middleware26/scripts/experiment,
+// cp-scheduler.py --app AAL --mode aware). Built on living_hipaa / living_emergency_unchecked, with the
+// paper's labels and requirements:
+//   labels     public < patient < internal ("public -> patient", "patient -> internal").
+//   Req-1      the fast pipeline (camera -> detector -> notifier) has p99 latency < 250 ms.
+//   Req-2      the fast pipeline stays available under a single node failure: the fall detector has a
+//              standby, and every notifier lane has two instances.
+//   Req-3      no flow from a higher to a lower label: label-segregated notifier lanes (the paper's
+//              "Notifier x4"), and placement by host label.
+// Hosts (hosts/living_demo.json): the paper's 8-host edge-to-cloud cluster, 2 vCPU / 4 GB each: three
+// public cloud hosts, three internal (private) cloud hosts, and two devices in the patient's home.
+// expect: plan; notifier gets public and patient lanes (2 instances each); detector gets a standby;
+//         recordManager, doctor and webServer on internal hosts; webServer DIFT Enabled (dynamic label)
+// sim-args: --hosts hosts/living_demo.json --dift living_demo.dift.json
+// External interfaces (living_demo.dift.json, from Figure 5's `sources`/`sinks`): the camera frame and the
+// wearable's readings are sources; the record store and the doctor's model are internal sinks; the web
+// server takes HTTP requests and answers each session at a dynamic label. The notifier's per-recipient
+// `send` label is not declared as an external sink: the lanes provide it (each notifier instance serves
+// one clearance, so its recipients are cleared for its lane), which keeps the notifier DIFT-optimized as
+// in Figure 6.
+
+labels {
+  public < patient;
+  patient < internal;
+}
+
+clock capture_time: i64 unit ms;
+
+// A frame in which the resident is recognised carries their id (the paper's `frame.id`).
+type video_frame { ts: capture_time, person: string, data: string }   // data: the frame, base64
+type record { patient_id: string, ts: capture_time, vitals: json }
+
+// Figure 5, line 23: frames showing the resident are `patient`, the rest `public`.
+labeller frame_label (f: video_frame) = f.person != '' ? patient : public;
+
+graph AmbientAssistedLiving(cameraConfig: string, wearableConfig: string, doctorModelPath: string) {
+  topology {
+    // The stages are the stand-ins in this folder (same ports, fields and labels; no ML models).
+    node camera () => (out: video_frame)             = process('node', 'camera.js', cameraConfig);
+    node wearable () => (out: record)                = process('node', 'wearable.js', wearableConfig);
+    node detector (in: video_frame) => (out: record) = process('node', 'detector.js');
+    // One input port for both the detector's events and the wearable's readings (edges e2 and e3).
+    node recordManager (in: record) => (out: record) = process('node', 'record-manager.js');
+    // Keyless, so it can be replicated per label (lanes): the paper's "Notifier x4".
+    node notifier[] (in: record)                     = process('node', 'notifier.js');
+    node doctor (in: record) => (out: record)        = process('node', 'ai-doctor.js', doctorModelPath);
+    node webServer (in: record)                      = process('node', 'web-server.js');
+
+    edge e1: camera.out --> detector.in;
+    edge e2: detector.out --> recordManager.in;
+    edge e3: wearable.out --> recordManager.in;
+    edge e4: detector.out --> notifier.in;
+    edge e5: recordManager.out --> doctor.in;
+    edge e6: doctor.out --> webServer.in;
+
+    flow fast = { e1, e4 };
+  }
+
+  policy {
+    // Req-1 and Req-2 (Figure 5, lines 14-15).
+    max_latency(250ms, 99) by ts: fast;
+    always: detector, notifier;
+    partitions(2): notifier;          // two instances per label lane: the paper's four notifiers
+
+    // Sensors run on the devices in the patient's home.
+    pin('home-camera'): camera;
+    pin('home-wearable'): wearable;
+    // Health records and the AI doctor stay in the private cloud (data residency).
+    pin('internal-*'): recordManager, doctor;
+
+    // Sources (Figure 5, lines 22-27).
+    label(frame_label): camera.out;
+    label(patient): wearable.out;
+
+    // Health records and the AI doctor's model stay internal (lines 29-30).
+    label(internal): recordManager.out;
+    label(internal): doctor.out;
+
+    // The web server answers each user session at that session's label (line 34), decided at run time:
+    // with its external HTTP interface it is the one component that runs with the DIFT monitor (Figure 6).
+    label(dynamic: public..internal): webServer;
+  }
+}

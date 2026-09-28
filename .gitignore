@@ -1,0 +1,10 @@
+**/node_modules/**
+*.log
+.vs
+**/bin/Debug/**
+**/bin/Release/**
+**/obj/**
+**/publish/**
+*.njsproj.user
+*.csproj.user
+*.pubxml.user

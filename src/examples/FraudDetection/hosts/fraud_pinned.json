@@ -1,0 +1,9 @@
+[
+  { "name": "bank-onprem-1",   "zone": "dc-east", "label": "pci",    "cpuMillis": 8000,  "memoryMB": 16384, "executables": ["node"] },
+  { "name": "bank-onprem-2",   "zone": "dc-east", "label": "pci",    "cpuMillis": 8000,  "memoryMB": 16384, "executables": ["node"] },
+  { "name": "cloud-rack1-a",   "zone": "cloud-1", "label": "pci",    "cpuMillis": 16000, "memoryMB": 32768, "executables": ["node"] },
+  { "name": "cloud-rack1-b",   "zone": "cloud-1", "label": "pci",    "cpuMillis": 16000, "memoryMB": 32768, "executables": ["node"] },
+  { "name": "cloud-rack2-a",   "zone": "cloud-2", "label": "pci",    "cpuMillis": 16000, "memoryMB": 32768, "executables": ["node"] },
+  { "name": "cloud-rack2-b",   "zone": "cloud-2", "label": "pci",    "cpuMillis": 16000, "memoryMB": 32768, "executables": ["node"] },
+  { "name": "reporting-1",     "zone": "dc-west", "label": "masked", "cpuMillis": 4000,  "memoryMB": 8192,  "executables": ["node"] }
+]

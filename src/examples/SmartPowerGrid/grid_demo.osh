@@ -1,0 +1,72 @@
+// Demo: the Smart Power Grid application as configured in the Requalizer paper (Middleware '26, §5.3,
+// Figure 7b) and its reference scheduler and simulator (Requalizer-Middleware26/scripts/experiment,
+// cp-scheduler.py --app SPG --mode aware, dift-simulator.py --app SPG). Built on smartgrid.osh (the
+// runnable topology and record types) and grid_privacy_fixed / grid_edge_cloud (labels, availability).
+//   Shape      the paper's most complex DAG: a 3-edge-deep graph with parallel sub-graphs. The plug
+//              parser feeds the sliding window and the house- and plug-load predictors; the window
+//              feeds the global median and the per-plug medians, which feed the outlier detector.
+//   labels     public < client < internal (the paper's LOW < MEDIUM < HIGH). As in the paper's experiment,
+//              each reading's label is drawn uniformly from the three: the parser sets its `sensitivity`
+//              (0, 1 or 2) and the labeller maps it to a label.
+//   Req-3      label-segregated plug-median lanes (the paper's "PlugMedian x4", label-aware load
+//              balancer after the sliding window).
+//   Availability  the global median and the outlier detector have standbys (the paper's GlobalMedian (SB)
+//              and OutlierDetector (SB)); each plug-median lane has two instances.
+// Hosts (hosts/grid_demo.json): the paper's 8-host cluster, 2 vCPU / 4 GB each: three public, three
+// internal and two client hosts.
+// The parser adds a uniformly drawn `sensitivity` to each reading. There is no latency goal: readings carry
+// the data set's 2013 timestamps, not an ingestion time, so an event-time goal would need an ingestion
+// clock stamped by the parser and carried to the detector's output.
+// expect: plan; plugMedian gets public, client and internal lanes (2 instances each); median and detector
+//         get standbys
+// sim-args: --hosts hosts/grid_demo.json
+
+labels {
+  public < client;
+  client < internal;
+}
+
+type reading { sensitivity: i64, id: string, timestamp: i64, value: f64, property: i64, plugId: string, householdId: string, houseId: string }
+type window_entry { slidingWindowAction: string, timestamp: i64, value: f64, houseId: string, householdId: string, plugId: string }
+type global_median { timestamp: i64, globalMedianLoad: f64 }
+// (plug_median records also carry the plug's `key`, which a record type can't name: `key` is a keyword.
+//  Types are structural, so the extra field passes through.)
+type plug_median { timestamp: i64, plugMedianLoad: f64 }
+type outlier { slidingWindowStart: i64, slidingWindowEnd: i64, houseId: string, outlierPercentage: f64 }
+type house_prediction { timestamp: i64, houseId: string, predictedLoad: f64 }
+type plug_prediction { timestamp: i64, houseId: string, householdId: string, plugId: string, predictedLoad: f64 }
+
+labeller by_sensitivity (r: reading) = r.sensitivity == 0 ? public : (r.sensitivity == 1 ? client : internal);
+
+graph DSP_smartgrid(inputFile: string, outFilePrefix: string) {
+  topology {
+    node spout () => (out: reading) = process('node', 'SmartPlugParser.js', inputFile);
+    node window (in: reading) => (out: window_entry) = process('node', 'SmartGridSlidingWindow.js');
+    node median (in: window_entry) => (out: global_median) = process('node', 'GlobalMedianCalculator.js');
+    // Keyless, so it can be replicated per label (lanes): the paper's "PlugMedian x4".
+    node plugMedian[] (in: window_entry) => (out: plug_median) = process('node', 'PlugMedianCalculator.js');
+    node detector (in: json) => (out: outlier) = process('node', 'OutlierDetector.js');
+    node houseLoad (in: reading) => (out: house_prediction) = process('node', 'HouseLoadPredictor.js');
+    node plugLoad (in: reading) => (out: plug_prediction) = process('node', 'PlugLoadPredictor.js');
+    node oSink (in: outlier) = process('node', '/home/root/writer.js', outFilePrefix + '.outlier.out');
+    node pSink (in: house_prediction) = process('node', '/home/root/writer.js', outFilePrefix + '.prediction.out');
+
+    edge a1: spout.out --> window.in;
+    edge a2a: window.out --> median.in;
+    edge a2b: window.out --> plugMedian.in;
+    edge a3a: median.out --> detector.in;
+    edge a3b: plugMedian.out --> detector.in;
+    edge b1: spout.out --> houseLoad.in;
+    edge c1: spout.out --> plugLoad.in;
+    edge a4: detector.out --> oSink.in;
+    edge b2: houseLoad.out --> pSink.in;
+    edge c2: plugLoad.out --> pSink.in;
+  }
+
+  policy {
+    always: median, detector, plugMedian;
+    partitions(2): plugMedian;        // two instances per label lane
+
+    label(by_sensitivity): spout.out;
+  }
+}

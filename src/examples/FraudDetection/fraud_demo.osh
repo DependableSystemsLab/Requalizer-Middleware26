@@ -1,0 +1,57 @@
+// Demo: the Fraud Detection application as configured in the Requalizer paper (Middleware '26, §5.3,
+// Figure 7a) and its reference scheduler and simulator (Requalizer-Middleware26/scripts/experiment,
+// cp-scheduler.py --app FD --mode aware, dift-simulator.py --app FD). Built on fraud_pci / fraud_dift.
+//   Shape      shallow and wide: one parser fanning out to parallel, stateless predictor replicas.
+//   labels     public < client < internal (the paper's LOW < MEDIUM < HIGH). As in the paper's experiment,
+//              each transaction's label is drawn uniformly from the three: the parser sets its
+//              `sensitivity` (0, 1 or 2) and the labeller maps it to a label.
+//   Req-3      label-segregated predictor lanes: a transaction only reaches predictors cleared for its
+//              label (the paper's "Predictor x4", label-aware load balancer).
+//   QoS        low latency and high availability: two predictor instances per lane (redundancy 2 per
+//              label, as in load-balancer.py --redundancy 2); a p99 latency goal on the scoring path
+//              (the paper measures p99 ~80 ms for FD).
+// Hosts (hosts/fraud_demo.json): the paper's 8-host cluster, 2 vCPU / 4 GB each: three public, three
+// internal and two client hosts.
+// The parser and the predictor run with `records`: the parser emits transaction records (json, with a
+// uniformly drawn `sensitivity` and its ingestion time `ts`) instead of CSV segments, and the predictor
+// reads them and emits a scored record per transaction (outliers flagged), carrying `ts`. The latency goal
+// is in event time (`by ts`): from ingestion to the scored record. (The local Markov predictor needs 5
+// transactions of an entity to score it, which no entity in credit-card.dat has: every score is 0.)
+// expect: plan; predict gets public, client and internal lanes (2 instances each)
+// sim-args: --hosts hosts/fraud_demo.json
+
+labels {
+  public < client;
+  client < internal;
+}
+
+clock txn_time: i64 unit ms;
+
+type transaction { ts: txn_time, sensitivity: i64, entityId: string, transactionId: string, state: string }
+type scored      { ts: txn_time, entityId: string, score: f64, states: string, outlier: bool }
+
+labeller by_sensitivity (t: transaction) = t.sensitivity == 0 ? public : (t.sensitivity == 1 ? client : internal);
+
+graph DSP_frauddetection(inputFile: string, markovModel: string, outputFile: string) {
+  topology {
+    node spout () => (out: transaction)             = process('node', 'TransactionParser.js', inputFile, 'records');
+    // Keyless, so it can be replicated per label (lanes).
+    node predict[] (in: transaction) => (out: scored) = process('node', 'FraudPredictor.js', markovModel, 'records');
+    node sink (in: scored)                            = process('node', '/home/root/writer.js', outputFile);
+
+    edge e1: spout.out --> predict.in;
+    edge e2: predict.out --> sink.in;
+
+    flow scoring = { e1, e2 };
+  }
+
+  policy {
+    // Availability comes from the predictor lanes, as in the paper (no standby for the writer: oneos.js can't
+    // checkpoint a process with an open write stream yet).
+    always: predict;
+    partitions(2): predict;           // two instances per label lane
+    max_latency(100ms, 99) by ts: scoring;
+
+    label(by_sensitivity): spout.out;
+  }
+}

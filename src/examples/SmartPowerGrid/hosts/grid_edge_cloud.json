@@ -1,0 +1,7 @@
+[
+  { "name": "edge-nbhd-1", "zone": "nbhd-1", "label": "household", "cpuMillis": 2000,  "memoryMB": 2048,  "executables": ["node"] },
+  { "name": "edge-nbhd-2", "zone": "nbhd-2", "label": "household", "cpuMillis": 2000,  "memoryMB": 2048,  "executables": ["node"] },
+  { "name": "cloud-a",     "zone": "cloud",  "label": "utility",   "cpuMillis": 16000, "memoryMB": 32768, "executables": ["node"] },
+  { "name": "cloud-b",     "zone": "cloud",  "label": "utility",   "cpuMillis": 16000, "memoryMB": 32768, "executables": ["node"] },
+  { "name": "dash-1",      "zone": "dmz",    "label": "public",    "cpuMillis": 2000,  "memoryMB": 4096,  "executables": ["node"] }
+]

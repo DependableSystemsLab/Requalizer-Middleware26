@@ -1,0 +1,56 @@
+[
+  {
+    "name": "worker-1",
+    "zone": "az-a",
+    "cpuMillis": 16000,
+    "memoryMB": 32768,
+    "executables": [
+      "node"
+    ]
+  },
+  {
+    "name": "worker-2",
+    "zone": "az-b",
+    "cpuMillis": 16000,
+    "memoryMB": 32768,
+    "executables": [
+      "node"
+    ]
+  },
+  {
+    "name": "worker-3",
+    "zone": "az-a",
+    "cpuMillis": 16000,
+    "memoryMB": 32768,
+    "executables": [
+      "node"
+    ]
+  },
+  {
+    "name": "worker-4",
+    "zone": "az-b",
+    "cpuMillis": 16000,
+    "memoryMB": 32768,
+    "executables": [
+      "node"
+    ]
+  },
+  {
+    "name": "worker-5",
+    "zone": "az-a",
+    "cpuMillis": 16000,
+    "memoryMB": 32768,
+    "executables": [
+      "node"
+    ]
+  },
+  {
+    "name": "worker-6",
+    "zone": "az-b",
+    "cpuMillis": 16000,
+    "memoryMB": 32768,
+    "executables": [
+      "node"
+    ]
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "camera":        { "sources": [ { "location": "camera frame", "range": ["public", "patient"] } ] },
+  "wearable":      { "sources": [ { "location": "sensor data", "label": "patient" } ] },
+  "recordManager": { "sinks":   [ { "location": "db", "label": "internal" } ] },
+  "doctor":        { "sinks":   [ { "location": "model", "label": "internal" } ] },
+  "webServer":     { "sources": [ { "location": "http request", "label": "public" } ],
+                     "sinks":   [ { "location": "response", "dynamic": true, "lowerBound": "public" } ] }
+}

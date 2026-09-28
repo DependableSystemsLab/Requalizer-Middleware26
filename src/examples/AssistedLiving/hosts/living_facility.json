@@ -1,0 +1,8 @@
+[
+  { "name": "east-srv-1",  "zone": "east-wing", "label": "east_phi",    "cpuMillis": 8000, "memoryMB": 16384, "executables": ["node"] },
+  { "name": "east-srv-2",  "zone": "east-wing", "label": "east_phi",    "cpuMillis": 8000, "memoryMB": 16384, "executables": ["node"] },
+  { "name": "west-srv-1",  "zone": "west-wing", "label": "west_phi",    "cpuMillis": 8000, "memoryMB": 16384, "executables": ["node"] },
+  { "name": "west-srv-2",  "zone": "west-wing", "label": "west_phi",    "cpuMillis": 8000, "memoryMB": 16384, "executables": ["node"] },
+  { "name": "east-kiosk",  "zone": "east-wing", "label": "east_public", "cpuMillis": 2000, "memoryMB": 4096,  "executables": ["node"] },
+  { "name": "west-kiosk",  "zone": "west-wing", "label": "west_public", "cpuMillis": 2000, "memoryMB": 4096,  "executables": ["node"] }
+]

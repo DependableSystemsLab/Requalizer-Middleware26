@@ -1,0 +1,10 @@
+[
+  { "name": "cam-hallway",   "zone": "home",     "label": "public",   "cpuMillis": 1000, "memoryMB": 1024,  "executables": ["node"] },
+  { "name": "cam-bedroom",   "zone": "home",     "label": "phi",      "cpuMillis": 1000, "memoryMB": 1024,  "executables": ["node"] },
+  { "name": "home-hub",      "zone": "home",     "label": "phi",      "cpuMillis": 4000, "memoryMB": 4096,  "executables": ["node"] },
+  { "name": "home-hub-2",    "zone": "home",     "label": "phi",      "cpuMillis": 4000, "memoryMB": 4096,  "executables": ["node"] },
+  { "name": "clinic-1",      "zone": "hospital", "label": "clinical", "cpuMillis": 8000, "memoryMB": 16384, "executables": ["node"] },
+  { "name": "clinic-2",      "zone": "hospital", "label": "clinical", "cpuMillis": 8000, "memoryMB": 16384, "executables": ["node"] },
+  { "name": "portal-1",      "zone": "cloud",    "label": "family",   "cpuMillis": 4000, "memoryMB": 8192,  "executables": ["node"] },
+  { "name": "portal-2",      "zone": "cloud",    "label": "family",   "cpuMillis": 4000, "memoryMB": 8192,  "executables": ["node"] }
+]
