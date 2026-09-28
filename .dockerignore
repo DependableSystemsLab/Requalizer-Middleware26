@@ -1,0 +1,8 @@
+# Host build output and environments: the image builds and installs its own. obj/ in particular holds
+# restore files with absolute host paths, which would break `dotnet build` inside the image.
+**/bin/
+**/obj/
+**/node_modules/
+scripts/presentation/.venv/
+**/*.log
+.git/

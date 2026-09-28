@@ -69,19 +69,19 @@ generate-mttr-table.py
 
 To run any of the scripts, we must activate the Python virtual environment. Activate `venv`:
 ```bash
-# CWD: /root/requalizer/scripts/experiment
-source ../presentation/.venv/bin/activate
+# CWD: /root/requalizer/scripts/presentation
+source .venv/bin/activate
 ```
 
 Then, run the scripts as the following:
 ```
-python plot-latency-histogram.py /root/requalizer/data/experiment-1/latency-data.csv
-python plot-throughput-snapshot.py /root/requalizer/data/experiment-1/throughput-data.csv
-python generate-violations-table.py /root/requalizer/data/experiment-1/violations-data.csv /root/requalizer/data/experiment-2/violations-data.csv
-python generate-mttr-table.py /root/requalizer/data/experiment-2/mttr-data.csv
+python plot-latency-histogram.py /root/requalizer/data/plot-latency.csv
+python plot-throughput-snapshot.py /root/requalizer/data/plot-throughput.csv
+python generate-violations-table.py /root/requalizer/data/exp1-violations.csv /root/requalizer/data/exp2-violations.csv
+python generate-mttr-table.py /root/requalizer/data/mttr-data.csv
 ```
 
-The above scripts should produce the figures and tables in the `/root/requalizer/scripts/presentation` directory. The files will be named as below:
+The above scripts should produce the figures and tables in the `/root/output` directory (the `REQUALIZER_OUTPUT_ROOT` environment variable). The files will be named as below:
 ```
 latency-plot.pdf
 throughput-plot.pdf
@@ -92,7 +92,7 @@ mttr-table.txt
 If you have mounted a host directory, you should be able to see these files in the host machine. If not, you will need to `docker cp` the files into the host machine.
 ```
 # From the host machine
-docker cp requalizer-exp:/root/requalizer/scripts/presentation/latency-histogram.YYYYmmdd_HHMMSS.png /path/on/my/machine/latency-histogram.png
+docker cp requalizer-exp:/root/output/latency-plot.pdf /path/on/my/machine/latency-plot.pdf
 ```
 
 You can compare the figures and tables you produced with the original ones included in the paper to verify that the scripts ran successfully.
@@ -166,57 +166,46 @@ If you run the discrete-event simulator (`python dift-simulator.py --app AAL --m
 
 ---
 
-#### Running Experiment 1: Efficiency and Correctness (Stable Conditions)
+#### Running the Experiment
 
-We will now run the first experiment described in Section 5.4 of the paper, which evaluates Requalizer under stable conditions (no machine or network failures).
+We will now run the experiment ourselves, which evaluates Requalizer's efficiency (end-to-end latency and throughput, Figures 8 and 9). It runs the three benchmark applications (Ambient Assisted Living, Fraud Detection, Smart Power Grid) under the three system configurations (Baseline, Layered DIFT, and Requalizer), 9 runs in all. Each run starts an 8-host OneOS cluster on this machine, deploys the application on it, streams the workload through it, and records profiles of every host.
 
-Navigate to the `/root/requalizer/scripts/experiment-1` directory.
+The quickest way is `run-experiment.sh`, which runs all 9 runs and prepares the data for the figures in one go (each step is described below, if you want to run them one by one):
+```
+# CWD: /root/requalizer/scripts/experiment
+./run-experiment.sh
+```
+
+It creates a directory `/root/output/experiment-YYYYmmdd-HHMMSS` and, when it finishes, prints the paths of the two files the figures are rendered from, `plot-latency.csv` and `plot-throughput.csv`, along with the commands to render them. Options after the output directory are passed to every run, e.g. `./run-experiment.sh /root/output/my-experiment --duration 60` to stream the AAL workload for 60 seconds instead of 30.
+
+**Step 1: Run all the demos.** `run-all.sh` runs the 9 runs one after another:
+```
+# CWD: /root/requalizer/scripts/experiment
+./run-all.sh /root/output/my-experiment/raw
+```
+Each run writes its results to a folder named `<APP>-<mode>` (e.g. `AAL-requalizer`): the profiles of every host (`profiles/`), the deployment plan (`plan.json`), and a summary (`summary.json`, `summary.txt`), which is also printed as each run finishes. The run's console output goes to `<APP>-<mode>.log` next to it. Without an output directory, the results go to `/root/requalizer/data/demo-results-YYYYmmdd-HHMMSS`. To run a single application under a single system, use `run-one.sh`, e.g. `./run-one.sh requalizer AAL /root/output/aal-requalizer`.
+
+**Step 2: Convert the runs into per-message data.** `compile-demo-results.py` reads the 9 run folders and writes one file per run, `data-<system>-<app>.csv` (e.g. `data-codift-aal.csv`), with one row per message that reached a sink: its send and arrival time, its end-to-end latency, the throughput at that moment, and its size. These are in the same format as the original data in `/root/requalizer/data`.
 ```
 # CWD: /root/requalizer/scripts/presentation
-cd ../experiment-1
+python3 compile-demo-results.py /root/output/my-experiment/raw /root/output/my-experiment
 ```
 
-Run the experiment script:
+**Step 3: Compile the data for the figures.** `compile-raw-files.js` combines the 9 files into `plot-latency.csv` and `plot-throughput.csv`:
 ```
-# CWD: /root/requalizer/scripts/experiment-1
-./run-stable-experiments.sh
-```
-
-This script will run the three benchmark applications (Ambient Assisted Living, Fraud Detection, Smart Power Grid) under three system configurations (Baseline, Layered DIFT, and Requalizer).
-
-Once the experiments have finished, there will be a directory in `/root/output` containing the raw measurements from each run.
-
-Navigate back to the presentation scripts to process the results:
-```
-cd ../presentation
-node compile-stable-results.js /root/output/exp1-YYYY-mm-dd
-```
-This will generate the CSV files `latency-data.csv`, `throughput-data.csv`, and `violations-data.csv`, which you can then pass to the Python plotting scripts described earlier to generate Figure 8, Figure 9, and the stable conditions portion of Table 3.
-
-
-#### Running Experiment 2: Resilience (Dynamic Conditions)
-
-Next, we run the second experiment described in Section 5.5, which evaluates Requalizer under node failures and network congestion.
-
-Navigate to the `/root/requalizer/scripts/experiment-2` directory.
-```
-cd ../experiment-2
+# CWD: /root/requalizer/scripts/presentation
+node compile-raw-files.js /root/output/my-experiment /root/output/my-experiment
 ```
 
-Run the experiment script:
+Finally, render Figures 8 and 9 with the plotting scripts, as with the original data:
 ```
-# CWD: /root/requalizer/scripts/experiment-2
-./run-dynamic-experiments.sh
+# CWD: /root/requalizer/scripts/presentation
+source .venv/bin/activate
+python plot-latency-histogram.py /root/output/my-experiment/plot-latency.csv
+python plot-throughput-snapshot.py /root/output/my-experiment/plot-throughput.csv
 ```
 
-This script will run the applications while injecting node failures (crashing critical components) and link congestion. It measures the Mean Time To Recover (MTTR) and monitors for DIFT violations during recovery and congestion.
-
-Once finished, compile the results:
-```
-cd ../presentation
-node compile-dynamic-results.js /root/output/exp2-YYYY-mm-dd
-```
-This will generate `mttr-data.csv` and the dynamic `violations-data.csv`. Use the Python scripts to generate Table 4 and the dynamic conditions portion of Table 3.
+> **Note:** Because the whole cluster runs locally on a single machine, the latencies and throughputs you see will be very different from those shown in the paper, which were measured on a cluster of eight virtual machines communicating over a real network. However, the general trend should hold: Requalizer's latency is similar to the Baseline's.
 
 
 ### (Optional) Building the Docker Image
